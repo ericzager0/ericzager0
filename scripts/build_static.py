@@ -82,24 +82,50 @@ def balance(items, widths, gap, avail):
 
 
 # ---------- curvas de nivel ----------
-def terrain(bumps):
-    def z(x, y):
-        h = sum(a*math.exp(-((x - cx)**2 + (y - cy)**2)/(2*s*s)) for cx, cy, s, a in bumps)
-        return h + .05*math.sin(x/97 + y/151) + .035*math.sin(y/63 - x/211)
-    return z
-
-
 def hill():
     """Un cerro inventado a la derecha de la portada: dos cumbres unidas por un collado, una tercera
-    más baja abajo y una loma que se pierde hacia el texto.
-    El plano se ondula antes de medir la altura, para que las curvas no salgan como círculos."""
-    peaks = [(925, 285, 78, 1.0), (1095, 120, 62, .86), (1010, 200, 70, .5), (790, 455, 85, .38), (1112, 402, 52, .55)]
+    más baja abajo, una loma que se pierde hacia el texto y otra debajo de la portada, que asoma en la
+    esquina de proyectos. El plano se ondula antes de medir la altura, para que las curvas no salgan
+    como círculos."""
+    peaks = [(925, 285, 78, 1.0), (1095, 120, 62, .86), (1010, 200, 70, .5), (790, 455, 85, .38), (1112, 402, 52, .55),
+             (1020, 650, 110, .42)]
 
     def z(x, y):
         wx = x + 24*math.sin(y/83 + 1) + 10*math.sin((x + y)/41) + 4*math.sin(y/17)
         wy = y + 20*math.sin(x/97) + 8*math.sin((x - y)/37) + 4*math.sin(x/19)
         return sum(a*math.exp(-((wx - cx)**2 + (wy - cy)**2)/(2*s*s)) for cx, cy, s, a in peaks)
     return z
+
+
+HERO_H = 500
+GAP = 23   # el aire que deja GitHub entre imágenes, en unidades del SVG con el ancho habitual del README
+
+
+def relief():
+    """El cerro de la portada: la función de altura, su cumbre y los niveles de las curvas.
+    La esquina de proyectos lo usa también, para que el terreno siga por debajo de la portada."""
+    z = hill()
+    sx, sy = max(((x, y) for x in range(800, 1120, 2) for y in range(120, 380, 2)), key=lambda p: z(*p))
+    return z, (sx, sy), [z(sx, sy)*(.05 + .07*i) for i in range(13)]
+
+
+def contour_style(t, i, n):
+    """Color, grosor y desfasaje de la marea de la curva i de n: las de arriba toman el color de acento,
+    y la marea baja desde la cumbre."""
+    warm = max(0, (i - (n - 5))/4)
+    return (f'stroke="{mix(t["topo"], t["accent"], .75*warm)}" stroke-width="{1 + .3*warm:.2f}" '
+            f'style="animation-delay:{(n - 1 - i)*1.1 - 20:.1f}s"')
+
+
+def contour_rings(z, levels, x0, y0, x1, y1):
+    """Las curvas de cada nivel ya suavizadas, sin los aros sueltos del tamaño de un punto."""
+    rings = {lv: [] for lv in levels}
+    for lv, pts, closed in isolines(z, x0, y0, x1, y1, 4, levels):
+        xs, ys = zip(*pts)
+        d = smooth_path(pts, closed, every=2)
+        if d and max(max(xs) - min(xs), max(ys) - min(ys)) > 24:
+            rings[lv].append(d)
+    return rings
 
 
 def isolines(f, x0, y0, x1, y1, step, levels):
@@ -233,28 +259,18 @@ def link(a, b, bend):
 
 
 def hero(t):
-    H = 500
+    H = HERO_H
     ty = Type()
-    z = hill()
-    sx, sy = max(((x, y) for x in range(800, 1120, 2) for y in range(120, 380, 2)), key=lambda p: z(*p))
-    levels = [z(sx, sy)*(.05 + .07*i) for i in range(13)]
-    rings = {lv: [] for lv in levels}
-    for lv, pts, closed in isolines(z, 520, -24, W + 24, H + 24, 4, levels):
-        xs, ys = zip(*pts)
-        d = smooth_path(pts, closed, every=2)
-        if d and max(max(xs) - min(xs), max(ys) - min(ys)) > 24:   # sin aros sueltos del tamaño de un punto
-            rings[lv].append(d)
+    z, (sx, sy), levels = relief()
+    rings = contour_rings(z, levels, 520, -24, W + 24, H + 24)
 
     # se dibujan de afuera hacia la cumbre, que toma el color de acento; después respiran en una onda
     # que baja desde la cumbre, la misma marea lenta del resto del perfil
     topo, n = [], len(levels)
     for i, lv in enumerate(levels):
-        warm = max(0, (i - (n - 5))/4)
-        stroke = mix(t["topo"], t["accent"], .75*warm)
         paths = "".join(f'<path class="draw" pathLength="1" d="{d}" style="animation-delay:{.1 + .14*i:.2f}s"/>'
                         for d in rings[lv])
-        topo.append(f'<g class="tide" stroke="{stroke}" stroke-width="{1 + .3*warm:.2f}" '
-                    f'style="animation-delay:{(n - 1 - i)*1.1 - 20:.1f}s">{paths}</g>')
+        topo.append(f'<g class="tide" {contour_style(t, i, n)}>{paths}</g>')
 
     name = ty.text(NAME, X0 - 5, 258, "display", 136, t["ink"], tracking=-.012)
     bio = "".join(ty.text(line, X0, 336 + i*44, "text", 30, t["ink2"])
@@ -379,19 +395,21 @@ def toolkit(t):
 def projects(t):
     ty = Type()
     rule = lambda y: f'<path d="M{X0} {y}H{X1}" stroke="{t["rule"]}" stroke-width="1.5"/>'
-    # un fragmento de relieve en la esquina, que retoma la portada y se desvanece antes del contenido;
-    # respira con la misma marea que las curvas de la portada, porque las animaciones de entrada ya terminaron
-    corner = terrain([(1240, -50, 170, 1.0), (1000, -110, 130, .6)])
-    levels = [.08 + i*.07 for i in range(11)]
-    paths = [d for d in (smooth_path(p, c) for _, p, c in isolines(corner, 520, -24, W + 24, 170, 6, levels)) if d]
-    topo = "".join(f'<path class="tide" d="{d}" style="animation-delay:{i*1.1 - 20:.1f}s"/>' for i, d in enumerate(paths))
+    # en la esquina sigue el mismo cerro de la portada, como si el terreno pasara por debajo de la hoja:
+    # las curvas que salen por abajo de la portada vuelven a entrar acá, con el mismo color y la misma marea,
+    # y se desvanecen antes del contenido. Las animaciones de entrada ya terminaron, así que solo respiran.
+    z, _, levels = relief()
+    top = 200
+    rings = contour_rings(lambda x, y: z(x, y + HERO_H + GAP), levels, 520, -24, W + 24, top)
+    topo = "".join(f'<g class="tide" {contour_style(t, i, len(levels))}>' + "".join(f'<path d="{d}"/>' for d in rings[lv]) + "</g>"
+                   for i, lv in enumerate(levels) if rings[lv])
     parts = [f'''<defs>
-  <linearGradient id="fx" x1="0" x2="1"><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset=".85" stop-color="#fff"/></linearGradient>
-  <linearGradient id="fy" x1="0" x2="0" y1="0" y2="1"><stop offset=".1" stop-color="#fff"/><stop offset=".85" stop-color="#fff" stop-opacity="0"/></linearGradient>
-  <mask id="mx"><rect width="{W}" height="170" fill="url(#fx)"/></mask>
-  <mask id="my"><rect width="{W}" height="170" fill="url(#fy)"/></mask>
+  <linearGradient id="fx" x1="0" x2="1"><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset=".7" stop-color="#fff"/></linearGradient>
+  <linearGradient id="fy" x1="0" x2="0" y1="0" y2="1"><stop offset=".1" stop-color="#fff"/><stop offset=".9" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <mask id="mx"><rect width="{W}" height="{top}" fill="url(#fx)"/></mask>
+  <mask id="my"><rect width="{W}" height="{top}" fill="url(#fy)"/></mask>
 </defs>
-<g clip-path="url(#sheet)"><g mask="url(#my)"><g mask="url(#mx)" fill="none" stroke="{t['topo']}" stroke-width="1.1">{topo}</g></g></g>''',
+<g clip-path="url(#sheet)"><g mask="url(#my)"><g mask="url(#mx)" fill="none" stroke-linecap="round" stroke-linejoin="round">{topo}</g></g></g>''',
              kicker(ty, t, "Proyectos", 76),
              ty.text("Lo que construí", X0 - 2, 140, "heading", 52, t["ink"], tracking=-.01)]
     y = 188
@@ -449,18 +467,23 @@ def button(t, text, label, primary):
     ty = Type()
     h, pad, size = 42, 22, 15
     w = round(width(text, "mono-md", size) + 2*pad)
+    # las tarjetas se ven reducidas al ancho del README (1200 unidades en unos 830 px) y los botones no:
+    # el margen, el borde y la sombra se pasan a esa escala para que el botón arranque donde arranca la hoja
+    # y tenga su mismo trazo
+    k = 830/W
+    x0, line, drop = 5*k, 1.5*k, 2.5*k
     dark = t["page"] != "#FFFFFF"
-    shape = (f'<rect x=".75" y="2.75" width="{w - 1.5}" height="{h - 1.5}" rx="{h/2 - .75}" '
-             f'fill="{"#000" if dark else t["ink"]}" fill-opacity="{.35 if dark else .08}"/>')
+    shape = (f'<rect x="{x0 + line/2:.2f}" y="{drop + line/2:.2f}" width="{w - line:.2f}" height="{h - line:.2f}" '
+             f'rx="{(h - line)/2:.2f}" fill="{"#000" if dark else t["ink"]}" fill-opacity="{.35 if dark else .08}"/>')
     if primary:
-        shape += f'<rect width="{w}" height="{h}" rx="{h/2}" fill="{t["accent"]}"/>'
+        shape += f'<rect x="{x0:.2f}" width="{w}" height="{h}" rx="{h/2}" fill="{t["accent"]}"/>'
         ink = t["btn_ink"]
     else:
-        shape += (f'<rect x=".75" y=".75" width="{w - 1.5}" height="{h - 1.5}" rx="{h/2 - .75}" fill="{t["paper"]}" '
-                  f'stroke="{t["edge"]}" stroke-width="1.5"/>')
+        shape += (f'<rect x="{x0 + line/2:.2f}" y="{line/2:.2f}" width="{w - line:.2f}" height="{h - line:.2f}" '
+                  f'rx="{(h - line)/2:.2f}" fill="{t["paper"]}" stroke="{t["edge"]}" stroke-width="{line:.2f}"/>')
         ink = t["ink"]
-    body = shape + ty.text(text, w/2, h/2 + 5.2, "mono-md", size, ink, anchor="middle")
-    return svg(w, h + 2, label, body, ty, motion=False)
+    body = shape + ty.text(text, x0 + w/2, h/2 + 5.2, "mono-md", size, ink, anchor="middle")
+    return svg(round(w + x0 + .5), round(h + drop), label, body, ty, motion=False)
 
 
 def main():
