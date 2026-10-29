@@ -14,7 +14,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/relieve-dark.svg">
-  <img alt="Relieve de mi actividad en GitHub durante el último año, actualizado todos los días." src="assets/relieve-light.svg" width="100%">
+  <img alt="Perfil de montaña con mi actividad en GitHub durante el último año, actualizado todos los días." src="assets/relieve-light.svg" width="100%">
 </picture>
 
 <br><br>
