@@ -1,28 +1,28 @@
 <p>
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/hero-dark.svg">
-  <img alt="Eric Zager. Buenos Aires, Argentina. I'm a fourth-year Computer Engineering student at UADE, focused on full-stack development and data analysis." src="assets/hero-light.svg" width="100%">
+  <img alt="Eric Zager. Buenos Aires, Argentina. Soy estudiante de cuarto año de Ingeniería en Informática en UADE, enfocado en desarrollo full-stack y análisis de datos." src="assets/hero-light.svg" width="100%">
 </picture>
 </p>
 
 <p>
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/projects-dark.svg">
-  <img alt="Projects. Odofull (personal, solo, 2026): scheduling app for independent dentists that confirms appointments over WhatsApp and offers cancelled slots to the next patient automatically; Next.js, TypeScript, PostgreSQL, Supabase, WhatsApp Cloud API. GrandPrixTracker (UADE, team of 4, 2026, in progress): booking platform for Formula 1 race packages with one atomic checkout and live stock checks against a legacy SOAP system; Java, Spring Boot, Next.js, PostgreSQL, microservices, ETL. PoleBid (UADE, team of 4, 2026): mobile app for real-time bidding at live auctions with concurrency control; React Native, TypeScript, Node.js, Express, PostgreSQL, Supabase Realtime. F1 Driver DNA (UADE, team of 4, 2026): data science system comparing F1 drivers across 70+ years with a custom Elo rating and clustering; Python, pandas, scikit-learn, UMAP, Streamlit. Earlier, 2025: FitBridge, a marketplace for personal trainers built solo with React, Node.js, Express, Prisma and PostgreSQL; and a sports matchmaking backend in Java and Spring Boot, where I led a team of four." src="assets/projects-light.svg" width="100%">
+  <img alt="Proyectos. Odofull (personal, individual, 2026): agenda para odontólogos independientes que confirma los turnos por WhatsApp y ofrece automáticamente los turnos cancelados al siguiente paciente; Next.js, TypeScript, PostgreSQL, Supabase, WhatsApp Cloud API. GrandPrixTracker (UADE, equipo de 4, 2026, en curso): plataforma de reservas de paquetes para carreras de Fórmula 1 con un único checkout atómico y control de stock en vivo contra un sistema SOAP heredado; Java, Spring Boot, Next.js, PostgreSQL, microservicios, ETL. PoleBid (UADE, equipo de 4, 2026): app móvil para pujar en tiempo real en subastas en vivo, con control de concurrencia; React Native, TypeScript, Node.js, Express, PostgreSQL, Supabase Realtime. F1 Driver DNA (UADE, equipo de 4, 2026): sistema de ciencia de datos que compara pilotos de F1 a lo largo de más de 70 años, con un rating Elo propio y agrupamiento en arquetipos; Python, pandas, scikit-learn, UMAP, Streamlit. Anteriores, 2025: FitBridge, un marketplace de entrenadores personales que desarrollé solo con React, Node.js, Express, Prisma y PostgreSQL; y un backend de matchmaking deportivo en Java y Spring Boot, donde lideré un equipo de cuatro." src="assets/projects-light.svg" width="100%">
 </picture>
 </p>
 
 <p>
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/stack-dark.svg">
-  <img alt="Toolkit. Languages: Java, TypeScript, JavaScript, Python, SQL. Backend: Spring Boot, JPA / Hibernate, Node.js, Express, JWT & OAuth. Frontend: React, Next.js, React Native, Tailwind CSS. Databases: PostgreSQL, SQL Server, MongoDB, Neo4j, Redis. Data: pandas, scikit-learn. Tools: Git, Docker, Supabase, Vercel, Render, Postman, Claude Code." src="assets/stack-light.svg" width="100%">
+  <img alt="Stack. Lenguajes: Java, TypeScript, JavaScript, Python, SQL. Backend: Spring Boot, JPA / Hibernate, Node.js, Express, JWT & OAuth. Frontend: React, Next.js, React Native, Tailwind CSS. Bases de datos: PostgreSQL, SQL Server, MongoDB, Neo4j, Redis. Datos: pandas, scikit-learn. Herramientas: Git, Docker, Supabase, Vercel, Render, Postman, Claude Code." src="assets/stack-light.svg" width="100%">
 </picture>
 </p>
 
 <p>
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/relieve-dark.svg">
-  <img alt="My GitHub activity over the last twelve months: running total and weekly contributions, updated daily." src="assets/relieve-light.svg" width="100%">
+  <img alt="Mi actividad en GitHub en los últimos doce meses: el total acumulado y las contribuciones de cada semana, actualizado todos los días." src="assets/relieve-light.svg" width="100%">
 </picture>
 </p>
 

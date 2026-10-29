@@ -125,12 +125,12 @@ MOTION = """
 @keyframes in{from{opacity:0}}
 .tide{animation:tide 10s ease-in-out infinite}
 @keyframes tide{0%,100%{opacity:.3}50%{opacity:1}}
-.leg{animation:leg 8s cubic-bezier(.5,0,.3,1) infinite backwards}
-@keyframes leg{0%{stroke-dashoffset:.16}12%,100%{stroke-dashoffset:-1}}
-.ping{transform-box:fill-box;transform-origin:center;animation:ping 8s ease-out infinite}
-@keyframes ping{0%{opacity:.7;transform:scale(.45)}18%,100%{opacity:0;transform:scale(1)}}
-.led{animation:led 8s ease-out infinite}
-@keyframes led{0%{opacity:1}15%,100%{opacity:.3}}
+.leg{animation:leg 10s cubic-bezier(.5,0,.3,1) infinite backwards}
+@keyframes leg{0%{stroke-dashoffset:.16}9.6%,100%{stroke-dashoffset:-1}}
+.ping{transform-box:fill-box;transform-origin:center;animation:ping 10s ease-out infinite}
+@keyframes ping{0%{opacity:.7;transform:scale(.45)}14%,100%{opacity:0;transform:scale(1)}}
+.led{animation:led 10s ease-out infinite}
+@keyframes led{0%{opacity:1}12%,100%{opacity:0}}
 .live{animation:live 2.5s ease-in-out infinite}
 @keyframes live{50%{opacity:.3}}
 .pulse{transform-box:fill-box;transform-origin:center;animation:pulse 5s ease-out infinite}

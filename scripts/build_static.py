@@ -22,42 +22,43 @@ with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons", "ico
 
 NAME = "Eric Zager"
 PLACE = "Buenos Aires, Argentina"
-BIO =("I’m a fourth-year Computer Engineering student at UADE, "
-       "focused on full-stack development and data analysis.")
+BIO = ("Soy estudiante de cuarto año de Ingeniería en Informática en UADE, "
+       "enfocado en desarrollo full-stack y análisis de datos.")
 
+# las categorías van en español; los nombres de cada tecnología, como se escriben siempre
 STACK = [
-    ("Languages", ["Java", "TypeScript", "JavaScript", "Python", "SQL"]),
+    ("Lenguajes", ["Java", "TypeScript", "JavaScript", "Python", "SQL"]),
     ("Backend", ["Spring Boot", "JPA / Hibernate", "Node.js", "Express", "JWT & OAuth"]),
     ("Frontend", ["React", "Next.js", "React Native", "Tailwind CSS"]),
-    ("Databases", ["PostgreSQL", "SQL Server", "MongoDB", "Neo4j", "Redis"]),
-    ("Data", ["pandas", "scikit-learn"]),
-    ("Tools", ["Git", "Docker", "Supabase", "Vercel", "Render", "Postman", "Claude Code"]),
+    ("Bases de datos", ["PostgreSQL", "SQL Server", "MongoDB", "Neo4j", "Redis"]),
+    ("Datos", ["pandas", "scikit-learn"]),
+    ("Herramientas", ["Git", "Docker", "Supabase", "Vercel", "Render", "Postman", "Claude Code"]),
 ]
 
 # nombre, contexto, etiqueta de estado, descripción, tecnologías
 PROJECTS = [
-    ("Odofull", "Personal · Solo · 2026", None,
-     "Scheduling app for independent dentists. It confirms appointments over WhatsApp and "
-     "offers cancelled slots to the next patient automatically.",
+    ("Odofull", "Personal · Individual · 2026", None,
+     "Agenda para odontólogos independientes. Confirma los turnos por WhatsApp y ofrece "
+     "automáticamente los turnos cancelados al siguiente paciente.",
      ["Next.js", "TypeScript", "PostgreSQL", "Supabase", "WhatsApp Cloud API"]),
-    ("GrandPrixTracker", "UADE · Team of 4 · 2026", "In progress",
-     "Booking platform for Formula 1 race packages. One atomic checkout covers hotel, tickets "
-     "and flights, with live stock checks against a legacy SOAP system.",
-     ["Java", "Spring Boot", "Next.js", "PostgreSQL", "Microservices", "ETL"]),
-    ("PoleBid", "UADE · Team of 4 · 2026", None,
-     "Mobile app for real-time bidding at live auctions, built on top of an existing database "
-     "with concurrency control so simultaneous bids stay consistent.",
+    ("GrandPrixTracker", "UADE · Equipo de 4 · 2026", "En curso",
+     "Plataforma de reservas de paquetes para carreras de Fórmula 1. Un único checkout atómico cubre "
+     "hotel, entradas y vuelos, con control de stock en vivo contra un sistema SOAP heredado.",
+     ["Java", "Spring Boot", "Next.js", "PostgreSQL", "Microservicios", "ETL"]),
+    ("PoleBid", "UADE · Equipo de 4 · 2026", None,
+     "App móvil para pujar en tiempo real en subastas en vivo, construida sobre una base de datos "
+     "existente, con control de concurrencia para que las ofertas simultáneas sean consistentes.",
      ["React Native", "TypeScript", "Node.js", "Express", "PostgreSQL", "Supabase Realtime"]),
-    ("F1 Driver DNA", "UADE · Team of 4 · 2026", None,
-     "Data science system that compares F1 drivers across 70+ years, with a custom Elo rating "
-     "that separates driver from car, and clusters drivers into archetypes.",
+    ("F1 Driver DNA", "UADE · Equipo de 4 · 2026", None,
+     "Sistema de ciencia de datos que compara pilotos de F1 a lo largo de más de 70 años, con un rating "
+     "Elo propio que separa al piloto del auto, y agrupa a los pilotos en arquetipos.",
      ["Python", "pandas", "scikit-learn", "UMAP", "Streamlit"]),
 ]
 EARLIER = [
-    ("FitBridge", "Marketplace that connects clients with personal trainers: listings, booking, "
-     "payments and scheduling. Built solo.", ["React", "Node.js", "Express", "Prisma", "PostgreSQL"]),
-    ("Sports matchmaking", "Backend to publish and find pickup games, with matchmaking and "
-     "notifications. I led a team of four.", ["Java", "Spring Boot", "PostgreSQL"]),
+    ("FitBridge", "Marketplace que conecta clientes con entrenadores personales: publicaciones, reservas, "
+     "pagos y agenda. Lo desarrollé solo.", ["React", "Node.js", "Express", "Prisma", "PostgreSQL"]),
+    ("Matchmaking deportivo", "Backend para publicar y encontrar partidos, con matchmaking y "
+     "notificaciones. Lideré un equipo de cuatro.", ["Java", "Spring Boot", "PostgreSQL"]),
 ]
 
 LINKS = [
@@ -206,10 +207,13 @@ def node(t, x, y, pings, kind="server"):
         shape = (f'<rect x="{x0:.1f}" y="{y0:.1f}" width="{w}" height="{h}" rx="6" {ink}/>'
                  f'<path d="M{x - 4:.1f} {y0 + 5:.1f}h8M{x0 + 6:.1f} {y0 + 25:.1f}h{w - 12}M{x0 + 6:.1f} {y0 + 31:.1f}h{w - 17}" {soft}/>')
         leds = [f'<rect x="{x0 + 6:.1f}" y="{y0 + 15:.1f}" width="{w - 12}" height="4" rx="2"']
-    # con tantas recepciones como luces, cada luz se enciende con una; si no, todas con la primera
-    times = pings if len(pings) == len(leds) else [pings[0] + .12*k for k in range(len(leds))]
-    shape += "".join(f'{tag} class="led" fill="{t["accent"]}" style="animation-delay:{at:.2f}s"/>'
-                     for tag, at in zip(leds, times))
+    # cada luz tiene una base tenue y un destello por cada recepción que le toca: las recepciones se
+    # reparten entre las luces en orden, y con una sola recepción se encienden todas, una tras otra
+    flashes = ([(k, pings[0] + .12*k) for k in range(len(leds))] if len(pings) == 1
+               else [(i % len(leds), at) for i, at in enumerate(pings)])
+    shape += "".join(f'{tag} fill="{t["accent"]}" fill-opacity=".35"/>' for tag in leds)
+    shape += "".join(f'{leds[k]} class="led" fill="{t["accent"]}" opacity="0" style="animation-delay:{at:.2f}s"/>'
+                     for k, at in flashes)
     rings = "".join(f'<rect class="ping" x="{x0 - 8:.1f}" y="{y0 - 8:.1f}" width="{w + 16}" height="{h + 16}" rx="12" '
                     f'fill="none" stroke="{t["accent"]}" stroke-width="1.5" opacity="0" style="animation-delay:{at:.2f}s"/>'
                     for at in pings)
@@ -259,21 +263,24 @@ def hero(t):
 
     # dos peticiones completas recorren el cerro, una después de la otra: el navegador le pide al servidor web
     # y el celular a la API móvil; los dos servidores consultan la misma base de datos y la respuesta vuelve
-    # por el mismo camino. Cada tramo tarda lo mismo y el ciclo dura 8 s.
+    # por el mismo camino. Entre una y otra, el servidor web le avisa a la API y la API le confirma.
+    # Cada tramo tarda lo mismo y el ciclo dura 10 s.
     peak = lambda x0, x1, y0, y1: max(((x, y) for x in range(x0, x1, 2) for y in range(y0, y1, 2)), key=lambda p: z(*p))
     web, api, db = (sx, sy), peak(1030, 1170, 50, 220), peak(1050, 1170, 330, 470)
     browser, phone = (836, 418), (958, 78)
     (b_web, web_b), (p_api, api_p) = link(browser, web, 20), link(phone, api, -18)
     (web_db, db_web), (api_db, db_api) = link(web, db, 22), link(api, db, -24)
+    web_api, api_web = link(web, api, 26)
     start = 4.4
     legs = [(b_web, 0), (web_db, 1.2), (db_web, 2.4), (web_b, 3.6),       # (trazo, salida)
-            (p_api, 4), (api_db, 5.2), (db_api, 6.4), (api_p, 7.6)]
+            (web_api, 3.6), (api_web, 4.8),
+            (p_api, 5), (api_db, 6.2), (db_api, 7.4), (api_p, 8.6)]
     packets = "".join(f'<path class="leg" pathLength="1" d="{d}" stroke-width="4.5" stroke-dasharray=".16 2" '
                       f'stroke-dashoffset=".16" style="animation-delay:{start + at:.1f}s"/>' for d, at in legs)
     # cada nodo recibe un poco antes de que el paquete termine de entrar
     nodes = "".join(node(t, *xy, [start + at for at in pings], kind) for xy, pings, kind in [
-        (web, [.9, 3.3], "server"), (api, [4.9, 7.3], "server"), (db, [2.1, 6.1], "db"),
-        (browser, [4.5], "web"), (phone, [8.5], "phone")])
+        (web, [.9, 3.3, 5.7], "server"), (api, [4.5, 5.9, 8.3], "server"), (db, [2.1, 7.1], "db"),
+        (browser, [4.5], "web"), (phone, [9.5], "phone")])
 
     body = f'''{sheet(t, W, H, seed=3)}
 <defs>
@@ -284,7 +291,7 @@ def hero(t):
 {chr(10).join(topo)}
 </g></g>
 <g fill="none" stroke="{t['accent']}" stroke-linecap="round">
-  <g class="in" stroke-width="3.2" stroke-opacity=".8" stroke-dasharray="0 9" style="animation-delay:3s"><path d="{b_web}"/><path d="{p_api}"/><path d="{web_db}"/><path d="{api_db}"/></g>
+  <g class="in" stroke-width="3.2" stroke-opacity=".8" stroke-dasharray="0 9" style="animation-delay:3s"><path d="{b_web}"/><path d="{p_api}"/><path d="{web_db}"/><path d="{api_db}"/><path d="{web_api}"/></g>
   {packets}
 </g>
 {nodes}
@@ -346,8 +353,8 @@ def clusters(t):
 
 def toolkit(t):
     ty = Type()
-    parts = [clusters(t), kicker(ty, t, "Toolkit", 76),
-             ty.text("Tools I reach for", X0 - 2, 140, "heading", 52, t["ink"], tracking=-.01)]
+    parts = [clusters(t), kicker(ty, t, "Stack", 76),
+             ty.text("Con qué trabajo", X0 - 2, 140, "heading", 52, t["ink"], tracking=-.01)]
     col, size, lh, gap = COL, 25, 46, 34
     ic, ic_gap = 24, 10
     y = 188
@@ -364,7 +371,7 @@ def toolkit(t):
                 x += widths[i] + gap
         y += 76 + (len(lines) - 1)*lh
     parts.append(f'<path d="M{X0} {y}H{X1}" stroke="{t["rule"]}" stroke-width="1.5"/>')
-    label = "Toolkit. " + "; ".join(f"{k}: {', '.join(v)}" for k, v in STACK) + "."
+    label = "Stack. " + "; ".join(f"{k}: {', '.join(v)}" for k, v in STACK) + "."
     return svg(W, y + 48, label, sheet(t, W, y + 48, seed=5) + "\n".join(parts), ty)
 
 
@@ -385,8 +392,8 @@ def projects(t):
   <mask id="my"><rect width="{W}" height="170" fill="url(#fy)"/></mask>
 </defs>
 <g clip-path="url(#sheet)"><g mask="url(#my)"><g mask="url(#mx)" fill="none" stroke="{t['topo']}" stroke-width="1.1">{topo}</g></g></g>''',
-             kicker(ty, t, "Projects", 76),
-             ty.text("What I’ve built", X0 - 2, 140, "heading", 52, t["ink"], tracking=-.01)]
+             kicker(ty, t, "Proyectos", 76),
+             ty.text("Lo que construí", X0 - 2, 140, "heading", 52, t["ink"], tracking=-.01)]
     y = 188
     for name, meta, status, desc, tech in PROJECTS:
         parts.append(rule(y))
@@ -414,11 +421,13 @@ def projects(t):
 
     # proyectos anteriores, en formato compacto como la tabla de herramientas
     parts.append(rule(y))
-    parts.append(ty.text("EARLIER · 2025", X0, y + 52, "mono-md", 15, t["muted"], tracking=.14))
+    parts.append(ty.text("ANTERIORES · 2025", X0, y + 52, "mono-md", 15, t["muted"], tracking=.14))
     y += 80
     for name, desc, tech in EARLIER:
         parts.append(rule(y))
-        parts.append(ty.text(name, X0, y + 46, "text", 25, t["ink"]))
+        # el nombre se parte en renglones si no entra en su columna, para no pisar la descripción
+        for i, line in enumerate(wrap(name, "text", 25, COL - X0 - 24)):
+            parts.append(ty.text(line, X0, y + 46 + i*32, "text", 25, t["ink"]))
         lines = wrap(desc, "text", 22, X1 - COL)
         for i, line in enumerate(lines):
             parts.append(ty.text(line, COL, y + 46 + i*32, "text", 22, t["ink2"]))
@@ -427,25 +436,31 @@ def projects(t):
         y = tech_y + 32
     parts.append(rule(y))
 
-    label = ("Projects. " + " ".join(f"{n} ({m}{', ' + s if s else ''}): {d} Built with {', '.join(k)}."
+    label = ("Proyectos. " + " ".join(f"{n} ({m}{', ' + s if s else ''}): {d} Hecho con {', '.join(k)}."
                                      for n, m, s, d, k in PROJECTS)
-             + " Earlier, 2025: " + " ".join(f"{n}: {d} Built with {', '.join(k)}." for n, d, k in EARLIER))
+             + " Anteriores, 2025: " + " ".join(f"{n}: {d} Hecho con {', '.join(k)}." for n, d, k in EARLIER))
     return svg(W, y + 48, label, sheet(t, W, y + 48, seed=4) + "\n".join(parts), ty)
 
 
 # ---------- botones ----------
 def button(t, text, label, primary):
+    """Botones nítidos, del mismo material que las tarjetas: el secundario es un trozo de la misma hoja,
+    y los dos llevan la sombra corta de las hojas. Sin grano ni borde vivo, para que se lean como botones."""
     ty = Type()
-    h, pad, size = 44, 22, 15
+    h, pad, size = 42, 22, 15
     w = round(width(text, "mono-md", size) + 2*pad)
+    dark = t["page"] != "#FFFFFF"
+    shape = (f'<rect x=".75" y="2.75" width="{w - 1.5}" height="{h - 1.5}" rx="{h/2 - .75}" '
+             f'fill="{"#000" if dark else t["ink"]}" fill-opacity="{.35 if dark else .08}"/>')
     if primary:
-        shape = f'<rect width="{w}" height="{h}" rx="{h/2}" fill="{t["accent"]}"/>'
+        shape += f'<rect width="{w}" height="{h}" rx="{h/2}" fill="{t["accent"]}"/>'
         ink = t["btn_ink"]
     else:
-        shape = f'<rect x=".75" y=".75" width="{w - 1.5}" height="{h - 1.5}" rx="{h/2 - .75}" fill="none" stroke="{t["ink2"]}" stroke-opacity=".55" stroke-width="1.5"/>'
+        shape += (f'<rect x=".75" y=".75" width="{w - 1.5}" height="{h - 1.5}" rx="{h/2 - .75}" fill="{t["paper"]}" '
+                  f'stroke="{t["edge"]}" stroke-width="1.5"/>')
         ink = t["ink"]
     body = shape + ty.text(text, w/2, h/2 + 5.2, "mono-md", size, ink, anchor="middle")
-    return svg(w, h, label, body, ty, motion=False)
+    return svg(w, h + 2, label, body, ty, motion=False)
 
 
 def main():

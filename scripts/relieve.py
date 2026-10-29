@@ -18,12 +18,12 @@ import sys
 import urllib.request
 from zoneinfo import ZoneInfo
 
-from typeset import THEMES, Type, sheet, svg
+from typeset import THEMES, Type, sheet, svg, width
 
 USER = os.environ.get("GH_USER", "ericzager0")
 OUT = os.environ.get("OUT_DIR", "assets")
 TZ = ZoneInfo("America/Argentina/Buenos_Aires")
-MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
 QUERY = """
 query($login: String!) {
@@ -106,7 +106,7 @@ def bar(x, w, h, base, r=4):
 
 
 def fmt_date(d):
-    return f"{MONTHS[d.month - 1]} {d.day}, {d.year}"
+    return f"{d.day} {MONTHS[d.month - 1].lower()} {d.year}"
 
 
 # ---------- dibujo ----------
@@ -154,18 +154,21 @@ def render(total, weeks, t, today):
 <circle class="pulse" cx="{ex:.1f}" cy="{ey:.1f}" r="20" fill="none" stroke="{t['accent']}" stroke-width="1.5" opacity="0" style="animation-delay:3.2s"/>
 <g class="in" style="animation-delay:2.6s"><circle cx="{ex:.1f}" cy="{ey:.1f}" r="9" fill="{t['paper']}"/><circle cx="{ex:.1f}" cy="{ey:.1f}" r="5.5" fill="{t['accent']}"/></g>'''
         d0 = dt.date.fromisoformat(weeks[best][0][0])
-        best_txt = f"week of {MONTHS[d0.month - 1]} {d0.day} ({raw[best]})"
-        caption = f"Running total above, weekly contributions below. Busiest {best_txt}."
+        best_txt = f"la del {d0.day} de {MONTHS[d0.month - 1].lower()} ({raw[best]})"
+        caption = f"Total acumulado arriba, cada semana abajo. La más activa: {best_txt}."
     else:
-        chart = ty.text("No activity yet this year.", W/2, (TOP + BASE)/2, "text", 22, t["muted"], anchor="middle")
-        best_txt, caption = "", "Weekly contributions below."
+        chart = ty.text("Todavía no hay actividad este año.", W/2, (TOP + BASE)/2, "text", 22, t["muted"], anchor="middle")
+        best_txt, caption = "", "Abajo, las contribuciones de cada semana."
 
-    total_txt = f"{total:,}"
-    updated = f"Updated {fmt_date(today)}"
+    total_txt = f"{total:,}".replace(",", ".")
+    updated = f"Actualizado {fmt_date(today)}"
+    # el pie nunca pisa la fecha: si no entra, se queda sin la semana más activa
+    if width(caption, "text", 20) > X1 - X0 - width(updated.upper(), "mono", 14, .12) - 32:
+        caption = "Total acumulado arriba, cada semana abajo."
     body = f'''{sheet(t, W, H, seed=6)}
-{ty.text("ACTIVITY", X0, 76, "mono-md", 16, t["accent"], tracking=.14)}
-{ty.text("The last twelve months", X0 - 2, 140, "heading", 52, t["ink"], tracking=-.01)}
-{ty.text("CONTRIBUTIONS", X1, 76, "mono-md", 16, t["muted"], anchor="end", tracking=.14)}
+{ty.text("ACTIVIDAD", X0, 76, "mono-md", 16, t["accent"], tracking=.14)}
+{ty.text("Los últimos doce meses", X0 - 2, 140, "heading", 52, t["ink"], tracking=-.01)}
+{ty.text("CONTRIBUCIONES", X1, 76, "mono-md", 16, t["muted"], anchor="end", tracking=.14)}
 {ty.text(total_txt, X1 + 2, 140, "display", 64, t["ink"], anchor="end", features={"lnum": True})}
 <path d="M{X0} {BASE}H{X1}" stroke="{t['rule']}" stroke-width="1.5"/>
 {chart}
@@ -174,8 +177,8 @@ def render(total, weeks, t, today):
 {chr(10).join(axis)}
 {ty.text(caption, X0, H - 44, "text", 20, t["ink2"])}
 {ty.text(updated.upper(), X1, H - 45, "mono", 14, t["muted"], anchor="end", tracking=.12)}'''
-    label = (f"GitHub activity of {USER} over the last twelve months: {total_txt} contributions"
-             f"{', busiest ' + best_txt if best_txt else ''}. {updated}.")
+    label = (f"Actividad de {USER} en GitHub en los últimos doce meses: {total_txt} contribuciones"
+             f"{'; la semana más activa fue ' + best_txt if best_txt else ''}. {updated}.")
     return svg(W, H, label, body, ty)
 
 
