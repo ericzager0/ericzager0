@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Dibuja tu actividad de GitHub del último año como un perfil de montaña.
+Dibuja tu actividad de GitHub del último año: el total acumulado como un relieve
+que crece, y debajo las contribuciones de cada semana.
 
 Genera assets/relieve-light.svg y assets/relieve-dark.svg.
 Solo consulta la cantidad de contribuciones por día; nunca lee código ni repos.
@@ -12,24 +13,17 @@ Uso:
 import datetime as dt
 import json
 import os
+import random
 import sys
 import urllib.request
 from zoneinfo import ZoneInfo
 
-import numpy as np
+from typeset import THEMES, Type, svg
 
 USER = os.environ.get("GH_USER", "ericzager0")
 OUT = os.environ.get("OUT_DIR", "assets")
 TZ = ZoneInfo("America/Argentina/Buenos_Aires")
-
-SERIF = "Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', serif"
-THEMES = {
-    "light": dict(bg="#F3EEE3", ink="#26231F", muted="#7E7366", line="#9A6B4F", accent="#B8573A"),
-    "dark": dict(bg="#22201D", ink="#E4DDD1", muted="#8C8378", line="#8F7765", accent="#C08670"),
-}
-MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
-MES_LARGO = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
-             "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 QUERY = """
 query($login: String!) {
@@ -65,15 +59,13 @@ def fetch():
 
 
 def demo():
-    rng = np.random.default_rng(3)
+    rng = random.Random(3)
     end = dt.date.today()
     start = end - dt.timedelta(days=364 + (end.weekday() + 1) % 7)
     weeks, cur, total = [], [], 0
     d = start
     while d <= end:
-        season = 0.6 + 0.5*np.sin((d.timetuple().tm_yday/365)*2*np.pi*2 + 1.2)
-        burst = 2.5 if rng.random() < 0.06 else 1.0
-        n = int(rng.poisson(max(season, 0.05)*2.2*burst)) if rng.random() > 0.3 else 0
+        n = rng.choice([0, 0, 0, 1, 2, 3, 5, 8]) if rng.random() > .25 else 0
         wd = (d.weekday() + 1) % 7
         cur.append((d.isoformat(), n, wd)); total += n
         if wd == 6:
@@ -85,113 +77,104 @@ def demo():
 
 
 # ---------- geometría ----------
-W, H = 1280, 408
-X0, X1, BASE, PEAK = 84, 1196, 336, 148   # el pico más alto llega a BASE - PEAK
+W, H = 1200, 540
+X0, X1 = 80, 1120
+TOP, BASE = 200, 336         # banda del acumulado
+BAR_BASE, BAR_H = 420, 52    # banda de las semanas
 
 
-def curve(pts):
-    """Curva suave (Catmull-Rom) que pasa por todos los puntos."""
+def monotone(pts):
+    """Curva suave que nunca baja entre dos puntos que suben (Fritsch-Carlson)."""
+    n = len(pts)
+    if n < 3:
+        return "M" + " L".join(f"{x:.1f} {y:.1f}" for x, y in pts)
+    dx = [pts[i + 1][0] - pts[i][0] for i in range(n - 1)]
+    sl = [(pts[i + 1][1] - pts[i][1])/dx[i] for i in range(n - 1)]
+    m = [sl[0]] + [0 if sl[i - 1]*sl[i] <= 0 else 3*(dx[i - 1] + dx[i]) /
+                   ((2*dx[i] + dx[i - 1])/sl[i - 1] + (dx[i] + 2*dx[i - 1])/sl[i]) for i in range(1, n - 1)] + [sl[-1]]
     d = f"M{pts[0][0]:.1f} {pts[0][1]:.1f}"
-    for i in range(len(pts) - 1):
-        p0, p1, p2 = pts[max(i - 1, 0)], pts[i], pts[i + 1]
-        p3 = pts[min(i + 2, len(pts) - 1)]
-        c1 = (p1[0] + (p2[0] - p0[0])/6, p1[1] + (p2[1] - p0[1])/6)
-        c2 = (p2[0] - (p3[0] - p1[0])/6, p2[1] - (p3[1] - p1[1])/6)
-        d += f" C{c1[0]:.1f} {c1[1]:.1f} {c2[0]:.1f} {c2[1]:.1f} {p2[0]:.1f} {p2[1]:.1f}"
+    for i in range(n - 1):
+        (x0, y0), (x1, y1), h = pts[i], pts[i + 1], dx[i]/3
+        d += f" C{x0 + h:.1f} {y0 + m[i]*h:.1f} {x1 - h:.1f} {y1 - m[i + 1]*h:.1f} {x1:.1f} {y1:.1f}"
     return d
 
 
-def weekly(weeks):
-    raw = [sum(n for _, n, _ in w) for w in weeks]
-    # suavizado leve para que la cordillera se vea orgánica sin falsear los datos
-    sm = [(raw[max(i-1, 0)] + 2*raw[i] + raw[min(i+1, len(raw)-1)])/4 for i in range(len(raw))]
-    return raw, sm
+def bar(x, w, h, base, r=4):
+    r = min(r, h, w/2)
+    return (f"M{x:.1f} {base}V{base - h + r:.1f}Q{x:.1f} {base - h:.1f} {x + r:.1f} {base - h:.1f}"
+            f"H{x + w - r:.1f}Q{x + w:.1f} {base - h:.1f} {x + w:.1f} {base - h + r:.1f}V{base}Z")
+
+
+def fmt_date(d):
+    return f"{MONTHS[d.month - 1]} {d.day}, {d.year}"
 
 
 # ---------- dibujo ----------
 def render(total, weeks, t, today):
-    raw, sm = weekly(weeks)
-    n = len(sm)
-    xs = [X0 + i*(X1 - X0)/max(n - 1, 1) for i in range(n)]
-    mx = max(sm) if max(sm) > 0 else 1
+    ty = Type()
+    raw = [sum(n for _, n, _ in w) for w in weeks]
+    n = len(raw)
+    slot = (X1 - X0)/n
+    bw = min(12, slot*.62)
+    cx = [X0 + slot*(i + .5) for i in range(n)]
 
-    def layer(scale, expo):
-        return [(x, BASE - ((v/mx)**expo)*PEAK*scale) for x, v in zip(xs, sm)]
+    run, acc = [], 0
+    for v in raw:
+        acc += v; run.append(acc)
+    top_v = max(acc, 1)
+    pts = [(X0, BASE)] + [(x, BASE - v/top_v*(BASE - TOP)) for x, v in zip(cx, run)]
+    line = monotone(pts)
 
-    main = layer(1.0, 0.85)
-    mid = layer(0.74, 1.25)
-    back = layer(0.5, 1.7)
-    close = f" L{X1} {BASE} L{X0} {BASE}Z"
+    best = max(range(n), key=lambda i: raw[i]) if acc else None
+    peak_v = max(raw) or 1
+    bars = []
+    for i, v in enumerate(raw):
+        x = cx[i] - bw/2
+        if v:
+            fill = t["accent"] if i == best else t["bar"]
+            bars.append(f'<path d="{bar(x, bw, max(v/peak_v*BAR_H, 3), BAR_BASE)}" fill="{fill}"/>')
+        else:
+            bars.append(f'<rect x="{cx[i] - 1.5:.1f}" y="{BAR_BASE - 3}" width="3" height="3" rx="1.5" fill="{t["topo"]}" fill-opacity=".6"/>')
 
-    css = """
-.draw{animation:draw 2.4s cubic-bezier(.4,.1,.2,1) backwards}
-@keyframes draw{from{stroke-dasharray:1;stroke-dashoffset:1}to{stroke-dasharray:1;stroke-dashoffset:0}}
-.in{animation:in 1.2s ease-out backwards}
-@keyframes in{from{opacity:0}}
-@media (prefers-reduced-motion: reduce){*{animation:none!important}}"""
+    axis, last = [], None
+    for i, w in enumerate(weeks):
+        m = int(w[0][0][5:7])
+        if m != last and 2 < i < n - 2:
+            axis.append(ty.text(MONTHS[m - 1], cx[i], BAR_BASE + 36, "mono", 15, t["muted"], anchor="middle", tracking=.04))
+        last = m
 
-    hills = f'''<g class="in" style="animation-delay:.2s">
-  <path d="{curve(back)}{close}" fill="{t['accent']}" fill-opacity=".05"/>
-  <path d="{curve(mid)}" fill="none" stroke="{t['line']}" stroke-opacity=".3" stroke-width="1.2"/>
-  <path d="{curve(main)}{close}" fill="{t['accent']}" fill-opacity=".07"/>
-</g>
-<path class="draw" pathLength="1" d="{curve(main)}" fill="none" stroke="{t['line']}" stroke-width="2.2"
-      stroke-linejoin="round" stroke-linecap="round"/>'''
-
-    # eje de meses
-    axis = [f'<path d="M{X0} {BASE} H{X1}" stroke="{t["muted"]}" stroke-opacity=".35" stroke-width="1"/>']
-    starts, last_m = [], None
-    for wi, week in enumerate(weeks):
-        m = int(week[0][0][5:7])
-        if m != last_m:
-            starts.append((wi, m)); last_m = m
-    if len(starts) > 1 and starts[1][0] - starts[0][0] < 3:
-        starts = starts[1:]  # el primer mes es solo un pedacito: no lo rotulamos
-    last_x = -999
-    for wi, m in starts:
-        x = xs[wi]
-        if x - last_x > 64 and x < X1 - 30:
-            axis.append(f'<path d="M{x:.0f} {BASE} V{BASE+6}" stroke="{t["muted"]}" stroke-opacity=".5"/>')
-            axis.append(f'<text x="{x:.0f}" y="{BASE+34}" font-family="{SERIF}" font-style="italic" '
-                        f'font-size="19" fill="{t["muted"]}">{MES[m-1]}</text>')
-            last_x = x
-
-    # semana más activa
-    marker = ""
-    if max(raw) > 0:
-        wi = int(np.argmax(sm))
-        x, y = main[wi]
-        d0 = dt.date.fromisoformat(weeks[wi][0][0])
-        label = f"Semana del {d0.day} de {MES_LARGO[d0.month-1]}"
-        anchor = "start" if x < 260 else ("end" if x > W - 260 else "middle")
-        common = (f'x="{x:.0f}" y="{y-24:.0f}" text-anchor="{anchor}" font-family="{SERIF}" '
-                  f'font-style="italic" font-size="21"')
-        marker = f'''<g class="in" style="animation-delay:2.2s">
-  <circle cx="{x:.0f}" cy="{y:.0f}" r="12" fill="none" stroke="{t['accent']}" stroke-width="1.5" stroke-opacity=".55"/>
-  <circle cx="{x:.0f}" cy="{y:.0f}" r="4.5" fill="{t['accent']}"/>
-  <text {common} fill="{t['bg']}" stroke="{t['bg']}" stroke-width="8" stroke-linejoin="round">{label}</text>
-  <text {common} fill="{t['ink']}">{label}</text>
-</g>'''
+    if acc:
+        ex, ey = pts[-1]
+        chart = f'''<defs><linearGradient id="area" x1="0" x2="0" y1="0" y2="1">
+  <stop offset="0" stop-color="{t['accent']}" stop-opacity=".16"/><stop offset="1" stop-color="{t['accent']}" stop-opacity=".02"/>
+</linearGradient></defs>
+<path class="in" d="{line} L{ex:.1f} {BASE} Z" fill="url(#area)" style="animation-delay:1.4s"/>
+<path class="draw" pathLength="1" d="{line}" fill="none" stroke="{t['accent']}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<g class="in" style="animation-delay:2.6s"><circle cx="{ex:.1f}" cy="{ey:.1f}" r="9" fill="{t['paper']}"/><circle cx="{ex:.1f}" cy="{ey:.1f}" r="5.5" fill="{t['accent']}"/></g>'''
+        d0 = dt.date.fromisoformat(weeks[best][0][0])
+        best_txt = f"week of {MONTHS[d0.month - 1]} {d0.day} ({raw[best]})"
+        caption = f"Running total above, weekly contributions below. Busiest {best_txt}."
     else:
-        hills = (f'<text x="{W/2:.0f}" y="{BASE-40}" text-anchor="middle" font-family="{SERIF}" '
-                 f'font-style="italic" font-size="22" fill="{t["muted"]}">Todavía no hay actividad este año</text>')
+        chart = ty.text("No activity yet this year.", W/2, (TOP + BASE)/2, "text", 22, t["muted"], anchor="middle")
+        best_txt, caption = "", "Weekly contributions below."
 
-    total_txt = f"{total:,}".replace(",", ".")
-    noun = "contribución" if total == 1 else "contribuciones"
-    updated = f"Actualizado el {today.day} de {MES_LARGO[today.month-1]} de {today.year}"
-
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img"
-  aria-label="Perfil de la actividad de {USER} en GitHub: {total_txt} {noun} en el último año. {updated}.">
-<style>{css}</style>
-<rect width="{W}" height="{H}" rx="24" fill="{t['bg']}"/>
-<text x="72" y="92" font-family="{SERIF}" font-size="40" fill="{t['ink']}" letter-spacing="-.5">Actividad del último año</text>
-<path d="M76 116 q 18 -9 36 0 t 36 0 t 36 0" fill="none" stroke="{t['accent']}" stroke-width="2.5" stroke-linecap="round"/>
-<text x="1208" y="84" text-anchor="end" font-family="{SERIF}" font-size="26" fill="{t['ink']}">{total_txt} {noun}</text>
-<text x="1208" y="114" text-anchor="end" font-family="{SERIF}" font-style="italic" font-size="19" fill="{t['muted']}">{updated}</text>
-{hills}
+    total_txt = f"{total:,}"
+    updated = f"Updated {fmt_date(today)}"
+    body = f'''<rect x=".75" y=".75" width="{W - 1.5}" height="{H - 1.5}" rx="19.25" fill="{t['paper']}" stroke="{t['edge']}" stroke-width="1.5"/>
+{ty.text("ACTIVITY", X0, 76, "mono-md", 16, t["accent"], tracking=.14)}
+{ty.text("The last twelve months", X0 - 2, 140, "heading", 52, t["ink"], tracking=-.01)}
+{ty.text("CONTRIBUTIONS", X1, 76, "mono-md", 16, t["muted"], anchor="end", tracking=.14)}
+{ty.text(total_txt, X1 + 2, 140, "display", 64, t["ink"], anchor="end", features={"lnum": True})}
+<path d="M{X0} {BASE}H{X1}" stroke="{t['rule']}" stroke-width="1.5"/>
+{chart}
+<path d="M{X0} {BAR_BASE}H{X1}" stroke="{t['rule']}" stroke-width="1.5"/>
+{chr(10).join(bars)}
 {chr(10).join(axis)}
-{marker}
-</svg>'''
+{ty.text(caption, X0, H - 44, "text", 20, t["ink2"])}
+{ty.text(updated.upper(), X1, H - 45, "mono", 14, t["muted"], anchor="end", tracking=.12)}'''
+    label = (f"GitHub activity of {USER} over the last twelve months: {total_txt} contributions"
+             f"{', busiest ' + best_txt if best_txt else ''}. {updated}.")
+    return svg(W, H, label, body, ty)
 
 
 def main():

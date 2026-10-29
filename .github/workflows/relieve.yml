@@ -24,9 +24,9 @@ jobs:
           python-version: "3.12"
 
       - name: Instalar dependencias
-        run: pip install numpy==2.1.3
+        run: pip install uharfbuzz==0.57.0
 
-      - name: Dibujar el perfil de montaña
+      - name: Dibujar el gráfico de actividad
         run: python scripts/relieve.py
         env:
           GH_USER: ${{ github.repository_owner }}
