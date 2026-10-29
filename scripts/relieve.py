@@ -150,6 +150,7 @@ def render(total, weeks, t, today):
 </linearGradient></defs>
 <path class="in" d="{line} L{ex:.1f} {BASE} Z" fill="url(#area)" style="animation-delay:1.4s"/>
 <path class="draw" pathLength="1" d="{line}" fill="none" stroke="{t['accent']}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="pulse" cx="{ex:.1f}" cy="{ey:.1f}" r="20" fill="none" stroke="{t['accent']}" stroke-width="1.5" opacity="0" style="animation-delay:3.2s"/>
 <g class="in" style="animation-delay:2.6s"><circle cx="{ex:.1f}" cy="{ey:.1f}" r="9" fill="{t['paper']}"/><circle cx="{ex:.1f}" cy="{ey:.1f}" r="5.5" fill="{t['accent']}"/></g>'''
         d0 = dt.date.fromisoformat(weeks[best][0][0])
         best_txt = f"week of {MONTHS[d0.month - 1]} {d0.day} ({raw[best]})"

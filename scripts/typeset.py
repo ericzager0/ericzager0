@@ -118,6 +118,12 @@ MOTION = """
 @keyframes draw{from{stroke-dasharray:1;stroke-dashoffset:1}to{stroke-dasharray:1;stroke-dashoffset:0}}
 .in{animation:in 1.2s ease-out backwards}
 @keyframes in{from{opacity:0}}
+.drop{animation:drop .9s cubic-bezier(.3,1.45,.5,1) backwards}
+@keyframes drop{from{opacity:0;transform:translateY(-22px)}}
+.tide{animation:tide 10s ease-in-out infinite}
+@keyframes tide{0%,100%{opacity:.3}50%{opacity:1}}
+.pulse{transform-box:fill-box;transform-origin:center;animation:pulse 5s ease-out infinite}
+@keyframes pulse{0%{opacity:.5;transform:scale(.25)}70%,100%{opacity:0;transform:scale(1)}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important}}"""
 
 
