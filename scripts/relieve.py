@@ -18,7 +18,7 @@ import sys
 import urllib.request
 from zoneinfo import ZoneInfo
 
-from typeset import THEMES, Type, svg
+from typeset import THEMES, Type, sheet, svg
 
 USER = os.environ.get("GH_USER", "ericzager0")
 OUT = os.environ.get("OUT_DIR", "assets")
@@ -132,7 +132,8 @@ def render(total, weeks, t, today):
         x = cx[i] - bw/2
         if v:
             fill = t["accent"] if i == best else t["bar"]
-            bars.append(f'<path d="{bar(x, bw, max(v/peak_v*BAR_H, 3), BAR_BASE)}" fill="{fill}"/>')
+            # punta redondeada entera y base recta sobre el eje: más amable, sin tocar la altura del dato
+            bars.append(f'<path d="{bar(x, bw, max(v/peak_v*BAR_H, 3), BAR_BASE, r=bw/2)}" fill="{fill}"/>')
         else:
             bars.append(f'<rect x="{cx[i] - 1.5:.1f}" y="{BAR_BASE - 3}" width="3" height="3" rx="1.5" fill="{t["topo"]}" fill-opacity=".6"/>')
 
@@ -161,7 +162,7 @@ def render(total, weeks, t, today):
 
     total_txt = f"{total:,}"
     updated = f"Updated {fmt_date(today)}"
-    body = f'''<rect x=".75" y=".75" width="{W - 1.5}" height="{H - 1.5}" rx="19.25" fill="{t['paper']}" stroke="{t['edge']}" stroke-width="1.5"/>
+    body = f'''{sheet(t, W, H, seed=6)}
 {ty.text("ACTIVITY", X0, 76, "mono-md", 16, t["accent"], tracking=.14)}
 {ty.text("The last twelve months", X0 - 2, 140, "heading", 52, t["ink"], tracking=-.01)}
 {ty.text("CONTRIBUTIONS", X1, 76, "mono-md", 16, t["muted"], anchor="end", tracking=.14)}

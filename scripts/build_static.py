@@ -8,8 +8,9 @@ Uso:
 import json
 import math
 import os
+import random
 
-from typeset import THEMES, Type, svg, width, wrap
+from typeset import THEMES, Type, mix, sheet, svg, width, wrap
 
 OUT = os.environ.get("OUT_DIR", "assets")
 W = 1200
@@ -87,83 +88,16 @@ def terrain(bumps):
     return z
 
 
-# Silueta de Argentina muy simplificada (longitud, latitud): un guiño, no un mapa exacto.
-# Arranca en el límite con Bolivia y recorre el país en sentido horario.
-ARGENTINA = [
-    (-66.2, -21.8), (-64.3, -22.0), (-62.7, -22.1), (-60.5, -23.6), (-58.2, -24.4), (-57.6, -25.4),
-    (-55.8, -26.0), (-54.6, -25.6), (-53.7, -26.3), (-54.0, -27.2), (-55.8, -27.6), (-57.4, -29.6),
-    (-57.9, -31.5), (-58.3, -33.4), (-58.4, -34.5), (-57.2, -35.7), (-56.8, -36.6), (-57.6, -38.1),
-    (-61.0, -38.9), (-62.3, -39.0), (-62.2, -40.6), (-63.9, -41.2), (-65.0, -41.0), (-64.4, -42.5),
-    (-65.2, -43.4), (-65.4, -45.0), (-67.4, -46.0), (-65.9, -47.8), (-67.7, -49.4), (-68.9, -51.5),
-    (-68.4, -52.4), (-67.0, -53.7), (-65.3, -54.8), (-67.6, -55.0), (-68.6, -54.6), (-69.4, -52.3),
-    (-71.9, -52.0), (-72.4, -50.8), (-73.3, -49.4), (-72.4, -47.9), (-71.8, -46.4), (-71.6, -44.6),
-    (-71.9, -42.2), (-71.5, -39.8), (-71.1, -37.8), (-70.4, -35.6), (-70.0, -33.1), (-69.8, -30.6),
-    (-68.8, -28.0), (-68.4, -25.4), (-67.3, -23.9), (-67.1, -22.7),
-]
-MALVINAS = [
-    [(-61.3, -51.3), (-60.6, -51.25), (-59.9, -51.4), (-59.7, -51.8), (-60.2, -52.2), (-60.9, -52.1), (-61.35, -51.8)],
-    [(-59.4, -51.4), (-58.6, -51.3), (-57.8, -51.5), (-57.7, -51.8), (-58.3, -52.1), (-59.0, -52.3), (-59.4, -51.9)],
-]
-BUENOS_AIRES = (-58.4, -34.6)
-MAP_TOP, MAP_H, MAP_CX = 26, 448, 965   # el mapa ocupa casi todo el alto de la portada
-
-
-def project(lon, lat):
-    k = MAP_H/33.2
-    return MAP_CX + (lon + 63.4)*math.cos(math.radians(38))*k, MAP_TOP + (-21.8 - lat)*k
-
-
-def seg_dist(px, py, ax, ay, bx, by):
-    dx, dy = bx - ax, by - ay
-    t = max(0, min(1, ((px - ax)*dx + (py - ay)*dy)/(dx*dx + dy*dy)))
-    return math.hypot(px - ax - t*dx, py - ay - t*dy)
-
-
-def coast():
-    """Los polígonos del país ya proyectados, y una función que da (adentro, distancia a la costa)."""
-    polys = [[project(*p) for p in shape] for shape in [ARGENTINA] + MALVINAS]
-    edges = [(a, b) for poly in polys for a, b in zip(poly, poly[1:] + poly[:1])]
-
-    def locate(x, y):
-        inside = False
-        for (ax, ay), (bx, by) in edges:
-            if (ay > y) != (by > y) and x < ax + (y - ay)*(bx - ax)/(by - ay):
-                inside = not inside
-        return inside, min(seg_dist(x, y, *a, *b) for a, b in edges)
-    return polys, locate
-
-
-def country_relief():
-    """Relieve evocado: llano adentro, con la cordillera al oeste. Devuelve la función de altura."""
-    polys, locate = coast()
-    # la cordillera corre por el borde oeste (del extremo sur hacia el norte), un poco hacia adentro
-    andes = [(x + 22, y) for x, y in polys[0][polys[0].index(project(-69.4, -52.3)):]]
-    # sierras de Córdoba, de Tandil y la meseta patagónica, para que el interior no quede vacío
-    hills = [(*project(lon, lat), s, a) for lon, lat, s, a in
-             [(-64.6, -31.6, 13, .38), (-59.6, -37.6, 9, .2), (-68.6, -43.2, 26, .22)]]
+def hill():
+    """Un cerro inventado a la derecha de la portada: dos cumbres unidas por un collado, una tercera
+    más baja abajo y una loma que se pierde hacia el texto.
+    El plano se ondula antes de medir la altura, para que las curvas no salgan como círculos."""
+    peaks = [(925, 285, 78, 1.0), (1095, 120, 62, .86), (1010, 200, 70, .5), (790, 455, 85, .38), (1112, 402, 52, .55)]
 
     def z(x, y):
-        inside, edge = locate(x, y)
-        if not inside:
-            return 0
-        ridge = min(seg_dist(x, y, *a, *b) for a, b in zip(andes, andes[1:]))
-        ease = lambda v: min(v, 1)*min(v, 1)*(3 - 2*min(v, 1))
-        noise = .5 + .25*math.sin(x/23 + y/41) + .25*math.sin(y/17 - x/37)
-        bumps = sum(a*math.exp(-((x - cx)**2 + (y - cy)**2)/(2*s*s)) for cx, cy, s, a in hills)
-        # la costa sube rápido; la cordillera, de a poco, para que sus curvas no se apilen en el borde
-        return ease(edge/10)*(.12 + .06*noise) + ease(edge/34)*(.8*math.exp(-ridge*ridge/(2*24*24)) + bumps)
-    return z
-
-
-def sea_depth():
-    """Fondo del mar alrededor del país: la distancia a la costa, ondulada para que se vea natural."""
-    _, locate = coast()
-
-    def z(x, y):
-        inside, edge = locate(x, y)
-        if inside:
-            return 0
-        return edge + min(edge/40, 1)*(7*math.sin(x/53 + y/89) + 5*math.sin(y/37 - x/71))
+        wx = x + 24*math.sin(y/83 + 1) + 10*math.sin((x + y)/41) + 4*math.sin(y/17)
+        wy = y + 20*math.sin(x/97) + 8*math.sin((x - y)/37) + 4*math.sin(x/19)
+        return sum(a*math.exp(-((wx - cx)**2 + (wy - cy)**2)/(2*s*s)) for cx, cy, s, a in peaks)
     return z
 
 
@@ -236,57 +170,124 @@ def smooth_path(pts, closed, every=3):
 
 
 # ---------- portada ----------
+def node(t, x, y, pings, kind="server"):
+    """Un nodo de la red centrado en (x, y): servidor de dos unidades, base de datos, navegador o celular.
+    Cada vez que recibe algo se le enciende una luz y lo rodea un anillo que se abre."""
+    ink = f'fill="{t["paper"]}" stroke="{t["ink2"]}" stroke-width="1.8"'
+    soft = f'stroke="{t["ink2"]}" stroke-opacity=".5" stroke-width="1.5" stroke-linecap="round"'
+    if kind == "server":
+        w, uh, gap = 46, 16, 4
+        x0, y0, h = x - w/2, y - uh - gap/2, 2*uh + gap
+        shape = "".join(f'<rect x="{x0:.1f}" y="{y0 + k*(uh + gap):.1f}" width="{w}" height="{uh}" rx="4" {ink}/>'
+                        f'<path d="M{x0 + 24:.1f} {y0 + k*(uh + gap) + uh/2:.1f}h14" {soft}/>' for k in range(2))
+        leds = [f'<circle cx="{x0 + 10:.1f}" cy="{y0 + k*(uh + gap) + uh/2:.1f}" r="3"' for k in range(2)]
+    elif kind == "db":
+        w, h, ry = 40, 44, 6
+        x0, y0 = x - w/2, y - h/2
+        band = lambda yy: f'M{x0:.1f} {yy:.1f}A{w/2} {ry} 0 0 0 {x0 + w:.1f} {yy:.1f}'
+        shape = (f'<path d="M{x0:.1f} {y0 + ry:.1f}V{y0 + h - ry:.1f}A{w/2} {ry} 0 0 0 {x0 + w:.1f} {y0 + h - ry:.1f}'
+                 f'V{y0 + ry:.1f}" {ink}/><ellipse cx="{x:.1f}" cy="{y0 + ry:.1f}" rx="{w/2}" ry="{ry}" {ink}/>'
+                 f'<path d="{band(y0 + h*.43)}{band(y0 + h*.71)}" fill="none" {soft}/>')
+        leds = [f'<circle cx="{x0 + w - 9:.1f}" cy="{y0 + h*f + 6:.1f}" r="3"' for f in (.43, .71)]
+    elif kind == "web":
+        # una ventana de navegador: barra con tres puntos y una página con renglones
+        w, h = 58, 42
+        x0, y0 = x - w/2, y - h/2
+        shape = (f'<rect x="{x0:.1f}" y="{y0:.1f}" width="{w}" height="{h}" rx="5" {ink}/>'
+                 f'<path d="M{x0:.1f} {y0 + 11:.1f}h{w}" {soft}/>'
+                 + "".join(f'<circle cx="{x0 + 7 + 5*k:.1f}" cy="{y0 + 5.5:.1f}" r="1.6" fill="{t["ink2"]}" fill-opacity=".6"/>'
+                           for k in range(3))
+                 + f'<path d="M{x0 + 8:.1f} {y0 + 28:.1f}h{w - 22}M{x0 + 8:.1f} {y0 + 35:.1f}h{w - 32}" {soft}/>')
+        leds = [f'<rect x="{x0 + 8:.1f}" y="{y0 + 17:.1f}" width="{w - 16}" height="4" rx="2"']
+    else:
+        # un celular: pantalla con un renglón que se enciende y el parlante arriba
+        w, h = 26, 46
+        x0, y0 = x - w/2, y - h/2
+        shape = (f'<rect x="{x0:.1f}" y="{y0:.1f}" width="{w}" height="{h}" rx="6" {ink}/>'
+                 f'<path d="M{x - 4:.1f} {y0 + 5:.1f}h8M{x0 + 6:.1f} {y0 + 25:.1f}h{w - 12}M{x0 + 6:.1f} {y0 + 31:.1f}h{w - 17}" {soft}/>')
+        leds = [f'<rect x="{x0 + 6:.1f}" y="{y0 + 15:.1f}" width="{w - 12}" height="4" rx="2"']
+    # con tantas recepciones como luces, cada luz se enciende con una; si no, todas con la primera
+    times = pings if len(pings) == len(leds) else [pings[0] + .12*k for k in range(len(leds))]
+    shape += "".join(f'{tag} class="led" fill="{t["accent"]}" style="animation-delay:{at:.2f}s"/>'
+                     for tag, at in zip(leds, times))
+    rings = "".join(f'<rect class="ping" x="{x0 - 8:.1f}" y="{y0 - 8:.1f}" width="{w + 16}" height="{h + 16}" rx="12" '
+                    f'fill="none" stroke="{t["accent"]}" stroke-width="1.5" opacity="0" style="animation-delay:{at:.2f}s"/>'
+                    for at in pings)
+    return f'{rings}<g class="in" style="animation-delay:2.6s">{shape}</g>'
+
+
+def link(a, b, bend):
+    """Un enlace curvo entre dos nodos, en un sentido y en el otro, para que los paquetes viajen por el mismo trazo."""
+    (ax, ay), (bx, by) = a, b
+    dist = math.dist(a, b)
+    ux, uy = (bx - ax)/dist, (by - ay)/dist
+    c1 = (ax + ux*dist*.3 - uy*bend, ay + uy*dist*.3 + ux*bend)
+    c2 = (bx - ux*dist*.3 + uy*bend, by - uy*dist*.3 - ux*bend)
+    go = f"M{ax} {ay}C{c1[0]:.1f} {c1[1]:.1f} {c2[0]:.1f} {c2[1]:.1f} {bx} {by}"
+    back = f"M{bx} {by}C{c2[0]:.1f} {c2[1]:.1f} {c1[0]:.1f} {c1[1]:.1f} {ax} {ay}"
+    return go, back
+
+
 def hero(t):
     H = 500
     ty = Type()
-    levels = [.03, .17, .27, .38, .5, .62, .74, .86]
-    lines = isolines(country_relief(), 740, 0, 1130, H, 3, levels)
-    topo = []
-    for lv, pts, closed in lines:
+    z = hill()
+    sx, sy = max(((x, y) for x in range(800, 1120, 2) for y in range(120, 380, 2)), key=lambda p: z(*p))
+    levels = [z(sx, sy)*(.05 + .07*i) for i in range(13)]
+    rings = {lv: [] for lv in levels}
+    for lv, pts, closed in isolines(z, 520, -24, W + 24, H + 24, 4, levels):
+        xs, ys = zip(*pts)
         d = smooth_path(pts, closed, every=2)
-        if not d:
-            continue
-        coast = lv == levels[0]
-        sw = 1.5 if coast else 1.1
-        op = "1" if coast else f"{.55 + .4*levels.index(lv)/len(levels):.2f}"
-        stroke = t["ink2"] if coast else t["topo"]
-        topo.append(f'<path class="draw" pathLength="1" d="{d}" stroke="{stroke}" stroke-width="{sw}" '
-                    f'stroke-opacity="{op}" style="animation-delay:{.1 + .12*levels.index(lv):.2f}s"/>')
+        if d and max(max(xs) - min(xs), max(ys) - min(ys)) > 24:   # sin aros sueltos del tamaño de un punto
+            rings[lv].append(d)
+
+    # se dibujan de afuera hacia la cumbre, que toma el color de acento; después respiran en una onda
+    # que baja desde la cumbre, la misma marea lenta del resto del perfil
+    topo, n = [], len(levels)
+    for i, lv in enumerate(levels):
+        warm = max(0, (i - (n - 5))/4)
+        stroke = mix(t["topo"], t["accent"], .75*warm)
+        paths = "".join(f'<path class="draw" pathLength="1" d="{d}" style="animation-delay:{.1 + .14*i:.2f}s"/>'
+                        for d in rings[lv])
+        topo.append(f'<g class="tide" stroke="{stroke}" stroke-width="{1 + .3*warm:.2f}" '
+                    f'style="animation-delay:{(n - 1 - i)*1.1 - 20:.1f}s">{paths}</g>')
 
     name = ty.text(NAME, X0 - 5, 258, "display", 136, t["ink"], tracking=-.012)
     bio = "".join(ty.text(line, X0, 336 + i*44, "text", 30, t["ink2"])
                   for i, line in enumerate(wrap(BIO, "text", 30, 600)))
     place = ty.text(PLACE.upper(), X0, 100, "mono-md", 16, t["muted"], tracking=.14)
-    px, py = (round(v, 1) for v in project(*BUENOS_AIRES))
 
-    # el mar alrededor: una marea lenta que se aleja de la costa, una vez que el mapa ya está dibujado
-    depths = [12, 26, 44, 66, 92, 122, 156, 194]
-    sea = []
-    for lv, pts, closed in isolines(sea_depth(), 560, -24, W + 24, H + 24, 6, depths):
-        d = smooth_path(pts, closed)
-        if d:
-            i = depths.index(lv)
-            sea.append(f'<path class="tide" d="{d}" stroke-opacity="{.85 - .06*i:.2f}" '
-                       f'style="animation-delay:{i*1.1 - 20:.1f}s"/>')
+    # dos peticiones completas recorren el cerro, una después de la otra: el navegador le pide al servidor web
+    # y el celular a la API móvil; los dos servidores consultan la misma base de datos y la respuesta vuelve
+    # por el mismo camino. Cada tramo tarda lo mismo y el ciclo dura 8 s.
+    peak = lambda x0, x1, y0, y1: max(((x, y) for x in range(x0, x1, 2) for y in range(y0, y1, 2)), key=lambda p: z(*p))
+    web, api, db = (sx, sy), peak(1030, 1170, 50, 220), peak(1050, 1170, 330, 470)
+    browser, phone = (836, 418), (958, 78)
+    (b_web, web_b), (p_api, api_p) = link(browser, web, 20), link(phone, api, -18)
+    (web_db, db_web), (api_db, db_api) = link(web, db, 22), link(api, db, -24)
+    start = 4.4
+    legs = [(b_web, 0), (web_db, 1.2), (db_web, 2.4), (web_b, 3.6),       # (trazo, salida)
+            (p_api, 4), (api_db, 5.2), (db_api, 6.4), (api_p, 7.6)]
+    packets = "".join(f'<path class="leg" pathLength="1" d="{d}" stroke-width="4.5" stroke-dasharray=".16 2" '
+                      f'stroke-dashoffset=".16" style="animation-delay:{start + at:.1f}s"/>' for d, at in legs)
+    # cada nodo recibe un poco antes de que el paquete termine de entrar
+    nodes = "".join(node(t, *xy, [start + at for at in pings], kind) for xy, pings, kind in [
+        (web, [.9, 3.3], "server"), (api, [4.9, 7.3], "server"), (db, [2.1, 6.1], "db"),
+        (browser, [4.5], "web"), (phone, [8.5], "phone")])
 
-    body = f'''<defs>
-  <clipPath id="card"><rect width="{W}" height="{H}" rx="20"/></clipPath>
-  <linearGradient id="fade" x1="0" x2="1"><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset=".68" stop-color="#fff"/></linearGradient>
+    body = f'''{sheet(t, W, H, seed=3)}
+<defs>
+  <linearGradient id="fade" x1="0" x2="1"><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset=".7" stop-color="#fff"/></linearGradient>
   <mask id="m"><rect width="{W}" height="{H}" fill="url(#fade)"/></mask>
 </defs>
-<rect x=".75" y=".75" width="{W - 1.5}" height="{H - 1.5}" rx="19.25" fill="{t['paper']}" stroke="{t['edge']}" stroke-width="1.5"/>
-<g clip-path="url(#card)"><g class="in" mask="url(#m)" fill="none" stroke="{t['topo']}" stroke-width="1" style="animation-delay:1.2s">
-{chr(10).join(sea)}
-</g></g>
-<g fill="none" stroke-linecap="round" stroke-linejoin="round">
+<g clip-path="url(#sheet)"><g mask="url(#m)" fill="none" stroke-linecap="round" stroke-linejoin="round">
 {chr(10).join(topo)}
+</g></g>
+<g fill="none" stroke="{t['accent']}" stroke-linecap="round">
+  <g class="in" stroke-width="3.2" stroke-opacity=".8" stroke-dasharray="0 9" style="animation-delay:3s"><path d="{b_web}"/><path d="{p_api}"/><path d="{web_db}"/><path d="{api_db}"/></g>
+  {packets}
 </g>
-<ellipse class="pulse" cx="{px}" cy="{py + 1}" rx="20" ry="6.5" fill="none" stroke="{t['accent']}" stroke-width="1.5" opacity="0" style="animation-delay:3.4s"/>
-<ellipse class="in" cx="{px}" cy="{py + 1}" rx="8" ry="2.6" fill="{t['ink']}" fill-opacity=".18" style="animation-delay:2.3s"/>
-<g class="drop" style="animation-delay:2.2s">
-  <path d="M{px} {py}C{px - 2} {py - 6} {px - 11} {py - 15} {px - 11} {py - 26}A11 11 0 1 1 {px + 11} {py - 26}C{px + 11} {py - 15} {px + 2} {py - 6} {px} {py}Z" fill="{t['accent']}"/>
-  <circle cx="{px}" cy="{py - 26}" r="4" fill="{t['paper']}"/>
-</g>
+{nodes}
 {place}
 {name}
 {bio}'''
@@ -304,13 +305,52 @@ def icon(name, x, y, size, color):
             + "".join(f'<path d="{d}"/>' for d in ic["paths"]) + "</g>")
 
 
+def clusters(t):
+    """Una nube de puntos que se agrupa sola en tres clusters, como k-means: los centroides buscan su lugar,
+    cada punto toma el color de su grupo y se une a su centroide; después se sueltan y vuelven a empezar.
+    En reposo (sin animación) queda el resultado: los tres grupos ya formados."""
+    rng = random.Random(11)
+    x0, x1, y0, y1 = 680, 1130, 34, 168
+    centers = [(790, 112), (930, 70), (1055, 128)]
+    colors = [t["accent"], t["ink2"], mix(t["topo"], t["ink2"], .35)]
+    cycle = 11
+    css, dots, spokes, marks = [], [], [], []
+    for k, (cx, cy) in enumerate(centers):
+        # el centroide arranca en cualquier lado y llega al centro de su grupo
+        sx_, sy_ = rng.uniform(x0 + 30, x1 - 30), rng.uniform(y0 + 20, y1 - 20)
+        css.append(f"@keyframes c{k}{{0%,18%{{transform:translate({sx_ - cx:.0f}px,{sy_ - cy:.0f}px);opacity:0}}"
+                   f"30%{{opacity:1}}50%,78%{{transform:none;opacity:1}}92%,100%{{transform:none;opacity:0}}}}"
+                   f".c{k}{{animation:c{k} {cycle}s ease-in-out infinite}}")
+        css.append(f"@keyframes k{k}{{0%,18%,100%{{fill:{t['topo']}}}50%,78%{{fill:{colors[k]}}}}}")
+        marks.append(f'<g class="c{k}"><circle cx="{cx}" cy="{cy}" r="7" fill="{t["paper"]}" stroke="{colors[k]}" stroke-width="2"/>'
+                     f'<circle cx="{cx}" cy="{cy}" r="2.2" fill="{colors[k]}"/></g>')
+        for _ in range(11):
+            px = min(max(rng.gauss(cx, 26), x0), x1)
+            py = min(max(rng.gauss(cy, 17), y0), y1)
+            # cada punto sale de un lugar al azar y llega a su grupo con un leve desfasaje
+            fx, fy = rng.uniform(x0, x1), rng.uniform(y0, y1)
+            i = len(dots)
+            lag = rng.uniform(0, .5)
+            css.append(f"@keyframes p{i}{{0%,16%,100%{{transform:translate({fx - px:.0f}px,{fy - py:.0f}px)}}"
+                       f"48%,80%{{transform:none}}}}")
+            dots.append(f'<circle cx="{px:.0f}" cy="{py:.0f}" r="4" fill="{colors[k]}" '
+                        f'style="animation:p{i} {cycle}s ease-in-out {lag:.2f}s infinite,k{k} {cycle}s ease-in-out {lag:.2f}s infinite"/>')
+            spokes.append(f"M{px:.0f} {py:.0f}L{cx} {cy}")
+    css.append(f"@keyframes spokes{{0%,50%,82%,100%{{opacity:0}}58%,74%{{opacity:1}}}}"
+               f".spokes{{animation:spokes {cycle}s ease-in-out infinite}}")
+    style = "" if os.environ.get("STATIC") else f'<style>{"".join(css)}</style>'
+    return (f'{style}<g class="in" style="animation-delay:.4s">'
+            f'<path class="spokes" d="{"".join(spokes)}" stroke="{t["topo"]}" stroke-width="1" stroke-opacity=".7"/>'
+            f'{"".join(dots)}{"".join(marks)}</g>')
+
+
 def toolkit(t):
     ty = Type()
-    parts = [kicker(ty, t, "Toolkit", 44),
-             ty.text("What I build with", X0 - 2, 108, "heading", 52, t["ink"], tracking=-.01)]
+    parts = [clusters(t), kicker(ty, t, "Toolkit", 76),
+             ty.text("Tools I reach for", X0 - 2, 140, "heading", 52, t["ink"], tracking=-.01)]
     col, size, lh, gap = COL, 25, 46, 34
     ic, ic_gap = 24, 10
-    y = 156
+    y = 188
     for label, items in STACK:
         parts.append(f'<path d="M{X0} {y}H{X1}" stroke="{t["rule"]}" stroke-width="1.5"/>')
         parts.append(ty.text(label.upper(), X0, y + 45, "mono-md", 15, t["muted"], tracking=.14))
@@ -325,7 +365,7 @@ def toolkit(t):
         y += 76 + (len(lines) - 1)*lh
     parts.append(f'<path d="M{X0} {y}H{X1}" stroke="{t["rule"]}" stroke-width="1.5"/>')
     label = "Toolkit. " + "; ".join(f"{k}: {', '.join(v)}" for k, v in STACK) + "."
-    return svg(W, y + 30, label, "\n".join(parts), ty, motion=False)
+    return svg(W, y + 48, label, sheet(t, W, y + 48, seed=5) + "\n".join(parts), ty)
 
 
 # ---------- proyectos ----------
@@ -333,7 +373,7 @@ def projects(t):
     ty = Type()
     rule = lambda y: f'<path d="M{X0} {y}H{X1}" stroke="{t["rule"]}" stroke-width="1.5"/>'
     # un fragmento de relieve en la esquina, que retoma la portada y se desvanece antes del contenido;
-    # respira con la misma marea que el mar de la portada, porque las animaciones de entrada ya terminaron
+    # respira con la misma marea que las curvas de la portada, porque las animaciones de entrada ya terminaron
     corner = terrain([(1240, -50, 170, 1.0), (1000, -110, 130, .6)])
     levels = [.08 + i*.07 for i in range(11)]
     paths = [d for d in (smooth_path(p, c) for _, p, c in isolines(corner, 520, -24, W + 24, 170, 6, levels)) if d]
@@ -344,10 +384,10 @@ def projects(t):
   <mask id="mx"><rect width="{W}" height="170" fill="url(#fx)"/></mask>
   <mask id="my"><rect width="{W}" height="170" fill="url(#fy)"/></mask>
 </defs>
-<g mask="url(#my)"><g mask="url(#mx)" fill="none" stroke="{t['topo']}" stroke-width="1.1">{topo}</g></g>''',
-             kicker(ty, t, "Projects", 44),
-             ty.text("What I’ve built", X0 - 2, 108, "heading", 52, t["ink"], tracking=-.01)]
-    y = 156
+<g clip-path="url(#sheet)"><g mask="url(#my)"><g mask="url(#mx)" fill="none" stroke="{t['topo']}" stroke-width="1.1">{topo}</g></g></g>''',
+             kicker(ty, t, "Projects", 76),
+             ty.text("What I’ve built", X0 - 2, 140, "heading", 52, t["ink"], tracking=-.01)]
+    y = 188
     for name, meta, status, desc, tech in PROJECTS:
         parts.append(rule(y))
         parts.append(ty.text(name, X0 - 1, y + 60, "heading", 36, t["ink"], tracking=-.005))
@@ -357,10 +397,14 @@ def projects(t):
         parts.append(ty.text(meta.upper(), X1, y + 58, "mono", 14, t["muted"], anchor="end", tracking=.12))
         if status:
             x = X0 + width(name, "heading", 36, -.005) + 20
-            w = width(status.upper(), "mono-md", 12, .12) + 24
+            w = width(status.upper(), "mono-md", 12, .12) + 38
+            # una luz de estado, la misma de los nodos de la portada: el proyecto sigue vivo
             parts.append(f'<rect x="{x:.1f}" y="{y + 34}" width="{w:.1f}" height="28" rx="14" fill="none" '
-                         f'stroke="{t["accent"]}" stroke-width="1.5"/>')
-            parts.append(ty.text(status.upper(), x + 12, y + 52.4, "mono-md", 12, t["accent"], tracking=.12))
+                         f'stroke="{t["accent"]}" stroke-width="1.5"/>'
+                         f'<circle class="pulse" cx="{x + 15:.1f}" cy="{y + 48}" r="9" fill="none" stroke="{t["accent"]}" '
+                         f'stroke-width="1.2" opacity="0" style="animation-delay:1.5s"/>'
+                         f'<circle class="live" cx="{x + 15:.1f}" cy="{y + 48}" r="3.5" fill="{t["accent"]}"/>')
+            parts.append(ty.text(status.upper(), x + 26, y + 52.4, "mono-md", 12, t["accent"], tracking=.12))
         lines = wrap(desc, "text", 25, 940)
         for i, line in enumerate(lines):
             parts.append(ty.text(line, X0, y + 106 + i*36, "text", 25, t["ink2"]))
@@ -386,7 +430,7 @@ def projects(t):
     label = ("Projects. " + " ".join(f"{n} ({m}{', ' + s if s else ''}): {d} Built with {', '.join(k)}."
                                      for n, m, s, d, k in PROJECTS)
              + " Earlier, 2025: " + " ".join(f"{n}: {d} Built with {', '.join(k)}." for n, d, k in EARLIER))
-    return svg(W, y + 30, label, "\n".join(parts), ty)
+    return svg(W, y + 48, label, sheet(t, W, y + 48, seed=4) + "\n".join(parts), ty)
 
 
 # ---------- botones ----------
