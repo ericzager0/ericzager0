@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Dibuja tu actividad de GitHub del último año como un relieve topográfico.
+Dibuja tu actividad de GitHub del último año como un perfil de montaña.
 
 Genera assets/relieve-light.svg y assets/relieve-dark.svg.
 Solo consulta la cantidad de contribuciones por día; nunca lee código ni repos.
@@ -16,11 +16,7 @@ import sys
 import urllib.request
 from zoneinfo import ZoneInfo
 
-import matplotlib
 import numpy as np
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
 
 USER = os.environ.get("GH_USER", "ericzager0")
 OUT = os.environ.get("OUT_DIR", "assets")
@@ -29,7 +25,7 @@ TZ = ZoneInfo("America/Argentina/Buenos_Aires")
 SERIF = "Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', serif"
 THEMES = {
     "light": dict(bg="#F3EEE3", ink="#26231F", muted="#7E7366", line="#9A6B4F", accent="#B8573A"),
-    "dark": dict(bg="#1E1C1A", ink="#EFEAE0", muted="#988D80", line="#C08A68", accent="#E07A57"),
+    "dark": dict(bg="#22201D", ink="#E4DDD1", muted="#8C8378", line="#8F7765", accent="#C08670"),
 }
 MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
 MES_LARGO = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
@@ -89,74 +85,61 @@ def demo():
 
 
 # ---------- geometría ----------
-def smooth(seg):
-    pts = seg[::2]
-    if not np.allclose(pts[-1], seg[-1]):
-        pts = np.vstack([pts, seg[-1]])
-    closed = np.hypot(*(seg[0] - seg[-1])) < 1e-6
+W, H = 1280, 408
+X0, X1, BASE, PEAK = 84, 1196, 336, 148   # el pico más alto llega a BASE - PEAK
+
+
+def curve(pts):
+    """Curva suave (Catmull-Rom) que pasa por todos los puntos."""
     d = f"M{pts[0][0]:.1f} {pts[0][1]:.1f}"
-    for i in range(1, len(pts) - 1):
-        mx, my = (pts[i] + pts[i + 1]) / 2
-        d += f" Q{pts[i][0]:.1f} {pts[i][1]:.1f} {mx:.1f} {my:.1f}"
-    return d + f" L{pts[-1][0]:.1f} {pts[-1][1]:.1f}" + ("Z" if closed else "")
+    for i in range(len(pts) - 1):
+        p0, p1, p2 = pts[max(i - 1, 0)], pts[i], pts[i + 1]
+        p3 = pts[min(i + 2, len(pts) - 1)]
+        c1 = (p1[0] + (p2[0] - p0[0])/6, p1[1] + (p2[1] - p0[1])/6)
+        c2 = (p2[0] - (p3[0] - p1[0])/6, p2[1] - (p3[1] - p1[1])/6)
+        d += f" C{c1[0]:.1f} {c1[1]:.1f} {c2[0]:.1f} {c2[1]:.1f} {p2[0]:.1f} {p2[1]:.1f}"
+    return d
 
 
-W, H = 1280, 420
-X0, X1, Y0, Y1 = 84, 1196, 166, 306
-
-
-def terrain(weeks):
-    nw = len(weeks)
-    cw, ch = (X1 - X0) / nw, (Y1 - Y0) / 7
-    pts = []
-    for wi, week in enumerate(weeks):
-        for _, n, wd in week:
-            if n > 0:
-                pts.append((X0 + (wi + .5)*cw, Y0 + (wd + .5)*ch, np.log1p(n)))
-    xs = np.arange(0, W + 4, 4); ys = np.arange(0, H + 4, 4)
-    X, Y = np.meshgrid(xs, ys)
-    # leve deformación para que el relieve se sienta orgánico
-    Xw = X + 6*np.sin(Y*0.045 + 1.3) + 4*np.sin(X*0.013)
-    Yw = Y + 5*np.sin(X*0.021 + 0.4)
-    Z = np.zeros_like(X, dtype=float)
-    for px, py, v in pts:
-        Z += v*np.exp(-(((Xw - px)/(cw*1.25))**2 + ((Yw - py)/(ch*1.15))**2)/2)
-    return X, Y, Z, cw
-
-
-def contour_paths(X, Y, Z):
-    zmax = Z.max()
-    if zmax <= 0:
-        return [], 0
-    levels = np.linspace(0.10*zmax, 0.92*zmax, 10)
-    fig, ax = plt.subplots(); cs = ax.contour(X, Y, Z, levels=levels); plt.close(fig)
-    return [(li, smooth(s)) for li, segs in enumerate(cs.allsegs) for s in segs if len(s) >= 5], len(levels)
+def weekly(weeks):
+    raw = [sum(n for _, n, _ in w) for w in weeks]
+    # suavizado leve para que la cordillera se vea orgánica sin falsear los datos
+    sm = [(raw[max(i-1, 0)] + 2*raw[i] + raw[min(i+1, len(raw)-1)])/4 for i in range(len(raw))]
+    return raw, sm
 
 
 # ---------- dibujo ----------
 def render(total, weeks, t, today):
-    X, Y, Z, cw = terrain(weeks)
-    paths, nl = contour_paths(X, Y, Z)
+    raw, sm = weekly(weeks)
+    n = len(sm)
+    xs = [X0 + i*(X1 - X0)/max(n - 1, 1) for i in range(n)]
+    mx = max(sm) if max(sm) > 0 else 1
+
+    def layer(scale, expo):
+        return [(x, BASE - ((v/mx)**expo)*PEAK*scale) for x, v in zip(xs, sm)]
+
+    main = layer(1.0, 0.85)
+    mid = layer(0.74, 1.25)
+    back = layer(0.5, 1.7)
+    close = f" L{X1} {BASE} L{X0} {BASE}Z"
 
     css = """
-.c{fill:none;stroke-linecap:round;stroke-linejoin:round}
-.draw{animation:draw 2.6s cubic-bezier(.4,.1,.2,1) backwards}
+.draw{animation:draw 2.4s cubic-bezier(.4,.1,.2,1) backwards}
 @keyframes draw{from{stroke-dasharray:1;stroke-dashoffset:1}to{stroke-dasharray:1;stroke-dashoffset:0}}
-.in{animation:in 1s ease-out backwards}
+.in{animation:in 1.2s ease-out backwards}
 @keyframes in{from{opacity:0}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important}}"""
 
-    lines = []
-    for li, d in paths:
-        op = 0.3 + 0.5*(li/max(nl - 1, 1))
-        lines.append(f'<path class="c draw" pathLength="1" d="{d}" stroke="{t["line"]}" '
-                     f'stroke-width="{1.9 if li % 4 == 3 else 1.0}" stroke-opacity="{op:.2f}" '
-                     f'style="animation-delay:{0.1*li:.2f}s"/>')
-    if not paths:
-        lines.append(f'<path d="M{X0} {(Y0+Y1)/2:.0f} H{X1}" stroke="{t["line"]}" stroke-opacity=".4"/>')
+    hills = f'''<g class="in" style="animation-delay:.2s">
+  <path d="{curve(back)}{close}" fill="{t['accent']}" fill-opacity=".05"/>
+  <path d="{curve(mid)}" fill="none" stroke="{t['line']}" stroke-opacity=".3" stroke-width="1.2"/>
+  <path d="{curve(main)}{close}" fill="{t['accent']}" fill-opacity=".07"/>
+</g>
+<path class="draw" pathLength="1" d="{curve(main)}" fill="none" stroke="{t['line']}" stroke-width="2.2"
+      stroke-linejoin="round" stroke-linecap="round"/>'''
 
     # eje de meses
-    axis = [f'<path d="M{X0} 344 H{X1}" stroke="{t["muted"]}" stroke-opacity=".35" stroke-width="1"/>']
+    axis = [f'<path d="M{X0} {BASE} H{X1}" stroke="{t["muted"]}" stroke-opacity=".35" stroke-width="1"/>']
     starts, last_m = [], None
     for wi, week in enumerate(weeks):
         m = int(week[0][0][5:7])
@@ -166,51 +149,48 @@ def render(total, weeks, t, today):
         starts = starts[1:]  # el primer mes es solo un pedacito: no lo rotulamos
     last_x = -999
     for wi, m in starts:
-            x = X0 + wi*cw
-            if x - last_x > 64 and x < X1 - 30:
-                axis.append(f'<path d="M{x:.0f} 340 V348" stroke="{t["muted"]}" stroke-opacity=".5"/>')
-                axis.append(f'<text x="{x:.0f}" y="374" font-family="{SERIF}" font-style="italic" '
-                            f'font-size="19" fill="{t["muted"]}">{MES[m-1]}</text>')
-                last_x = x
+        x = xs[wi]
+        if x - last_x > 64 and x < X1 - 30:
+            axis.append(f'<path d="M{x:.0f} {BASE} V{BASE+6}" stroke="{t["muted"]}" stroke-opacity=".5"/>')
+            axis.append(f'<text x="{x:.0f}" y="{BASE+34}" font-family="{SERIF}" font-style="italic" '
+                        f'font-size="19" fill="{t["muted"]}">{MES[m-1]}</text>')
+            last_x = x
 
     # semana más activa
     marker = ""
-    sums = [sum(n for _, n, _ in w) for w in weeks]
-    if max(sums) > 0:
-        wi = int(np.argmax(sums))
-        x = X0 + (wi + .5)*cw
-        col = np.argmin(abs(X[0] - x))
-        y = Y[:, col][np.argmax(Z[:, col])]
+    if max(raw) > 0:
+        wi = int(np.argmax(sm))
+        x, y = main[wi]
         d0 = dt.date.fromisoformat(weeks[wi][0][0])
         label = f"Semana del {d0.day} de {MES_LARGO[d0.month-1]}"
         anchor = "start" if x < 260 else ("end" if x > W - 260 else "middle")
         common = (f'x="{x:.0f}" y="{y-24:.0f}" text-anchor="{anchor}" font-family="{SERIF}" '
                   f'font-style="italic" font-size="21"')
-        marker = f'''<g class="in" style="animation-delay:{0.1*nl+1.2:.1f}s">
+        marker = f'''<g class="in" style="animation-delay:2.2s">
   <circle cx="{x:.0f}" cy="{y:.0f}" r="12" fill="none" stroke="{t['accent']}" stroke-width="1.5" stroke-opacity=".55"/>
   <circle cx="{x:.0f}" cy="{y:.0f}" r="4.5" fill="{t['accent']}"/>
   <text {common} fill="{t['bg']}" stroke="{t['bg']}" stroke-width="8" stroke-linejoin="round">{label}</text>
   <text {common} fill="{t['ink']}">{label}</text>
 </g>'''
+    else:
+        hills = (f'<text x="{W/2:.0f}" y="{BASE-40}" text-anchor="middle" font-family="{SERIF}" '
+                 f'font-style="italic" font-size="22" fill="{t["muted"]}">Todavía no hay actividad este año</text>')
 
     total_txt = f"{total:,}".replace(",", ".")
     noun = "contribución" if total == 1 else "contribuciones"
     updated = f"Actualizado el {today.day} de {MES_LARGO[today.month-1]} de {today.year}"
 
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img"
-  aria-label="Relieve de la actividad de {USER} en GitHub: {total_txt} {noun} en el último año. {updated}.">
+  aria-label="Perfil de la actividad de {USER} en GitHub: {total_txt} {noun} en el último año. {updated}.">
 <style>{css}</style>
-<defs><clipPath id="clip"><rect width="{W}" height="{H}" rx="24"/></clipPath></defs>
 <rect width="{W}" height="{H}" rx="24" fill="{t['bg']}"/>
 <text x="72" y="92" font-family="{SERIF}" font-size="40" fill="{t['ink']}" letter-spacing="-.5">Actividad del último año</text>
 <path d="M76 116 q 18 -9 36 0 t 36 0 t 36 0" fill="none" stroke="{t['accent']}" stroke-width="2.5" stroke-linecap="round"/>
 <text x="1208" y="84" text-anchor="end" font-family="{SERIF}" font-size="26" fill="{t['ink']}">{total_txt} {noun}</text>
 <text x="1208" y="114" text-anchor="end" font-family="{SERIF}" font-style="italic" font-size="19" fill="{t['muted']}">{updated}</text>
-<g clip-path="url(#clip)">
-{chr(10).join(lines)}
-</g>
-{marker}
+{hills}
 {chr(10).join(axis)}
+{marker}
 </svg>'''
 
 
