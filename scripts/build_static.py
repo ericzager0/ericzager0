@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Genera las piezas fijas del perfil: portada, proyectos, herramientas y botones de contacto.
+Genera las piezas fijas del perfil: portada, proyectos, herramientas y botones.
 
 Uso:
   python scripts/build_static.py
@@ -64,7 +64,11 @@ EARLIER = [
 LINKS = [
     ("linkedin", "LinkedIn ↗", "LinkedIn", True),
     ("mail", "ericzager0@gmail.com", "ericzager0@gmail.com", False),
+    ("odofull", "odofull.com.ar ↗", "Visitar Odofull en odofull.com.ar", False),
 ]
+# dominio de los proyectos publicados; se escribe junto al nombre como un dato más, en el color de los datos,
+# para que no parezca un link (la tarjeta es una imagen: el link de verdad es el botón que va debajo)
+SITES = {"Odofull": "odofull.com.ar"}
 
 
 def kicker(ty, t, label, y):
@@ -419,6 +423,9 @@ def projects(t):
         if name in ICONS:
             # el logo va después del nombre, a la altura de sus mayúsculas, sin tocar el margen izquierdo
             parts.append(icon(name, X0 + width(name, "heading", 36, -.005) + 14, y + 32, 30, t["ink2"]))
+        if name in SITES:
+            x = X0 + width(name, "heading", 36, -.005) + (14 + 30 + 22 if name in ICONS else 20)
+            parts.append(ty.text(SITES[name], x, y + 58, "mono", 15, t["muted"], tracking=.02))
         parts.append(ty.text(meta.upper(), X1, y + 58, "mono", 14, t["muted"], anchor="end", tracking=.12))
         if status:
             x = X0 + width(name, "heading", 36, -.005) + 20
@@ -454,7 +461,8 @@ def projects(t):
         y = tech_y + 32
     parts.append(rule(y))
 
-    label = ("Proyectos. " + " ".join(f"{n} ({m}{', ' + s if s else ''}): {d} Hecho con {', '.join(k)}."
+    label = ("Proyectos. " + " ".join(f"{n}{', ' + SITES[n] if n in SITES else ''} ({m}{', ' + s if s else ''}): "
+                                     f"{d} Hecho con {', '.join(k)}."
                                      for n, m, s, d, k in PROJECTS)
              + " Anteriores, 2025: " + " ".join(f"{n}: {d} Hecho con {', '.join(k)}." for n, d, k in EARLIER))
     return svg(W, y + 48, label, sheet(t, W, y + 48, seed=4) + "\n".join(parts), ty)
